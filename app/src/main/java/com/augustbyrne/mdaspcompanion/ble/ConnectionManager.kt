@@ -30,7 +30,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
-import com.augustbyrne.mdaspcompanion.ble.*
 import timber.log.Timber
 import java.lang.ref.WeakReference
 import java.util.UUID

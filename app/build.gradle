@@ -84,8 +84,8 @@ dependencies {
     implementation "androidx.compose.foundation:foundation:$compose_version"
     // Compose Animations
     implementation "androidx.compose.animation:animation:$compose_version"
-    // Material Design
-    implementation "androidx.compose.material:material:$compose_version"
+    // Material Design (remove to confirm that we are only using M3 version)
+    //implementation "androidx.compose.material:material:$compose_version"
     // Material design icons
     implementation "androidx.compose.material:material-icons-core:$compose_version"
     implementation "androidx.compose.material:material-icons-extended:$compose_version"
