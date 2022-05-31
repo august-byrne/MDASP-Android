@@ -56,7 +56,7 @@ fun ScanListUI(viewModel: MainViewModel, onClickDevice: (ScanResult) -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
         CenterAlignedTopAppBar(
             title = {
-                Text("MDASP Audio Controller")
+                Text("MDASP Controller")
             }
         )
         LazyColumn(

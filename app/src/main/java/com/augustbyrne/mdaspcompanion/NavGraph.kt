@@ -39,7 +39,9 @@ fun NavGraph(
         composable(
             route = "mdasp_controller"
         ) {
-            MDASPControlUI(viewModel)
+            MDASPControlUI(viewModel) {
+                navController.popBackStack()
+            }
         }
     }
 }
