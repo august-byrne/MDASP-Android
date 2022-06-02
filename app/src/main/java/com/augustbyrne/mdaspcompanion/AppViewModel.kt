@@ -4,6 +4,8 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -17,15 +19,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.*
 import javax.inject.Inject
 
 @HiltViewModel
-class MainViewModel @Inject constructor(
-
-): ViewModel() {
+class MainViewModel @Inject constructor(): ViewModel() {
 
     var scanListState: SnapshotStateList<ScanResult> = mutableStateListOf()
     var isScanning by mutableStateOf(false)
@@ -51,24 +50,16 @@ class MainViewModel @Inject constructor(
 
     var audioModel: AudioModel = AudioModel()
 
-        val connectionEventListener by lazy {
+    val connectionEventListener by lazy {
         ConnectionEventListener().apply {
             onCharacteristicRead = { _, characteristic ->
                 audioModel.setFromByteArray(characteristic.value)
             }
             onConnectionSetupComplete = {
-                runBlocking {
-                    withContext(Dispatchers.Default) {
-                        delay(400)
-                        device.value?.let { it1 ->
-                            ConnectionManager.readCharacteristic(
-                                it1,
-                                gattCharacteristicRead
-                            )
-                        }
-                    }
-                }
-
+                ConnectionManager.readCharacteristic(
+                    it.device,
+                    gattCharacteristicRead
+                )
             }
         }
     }

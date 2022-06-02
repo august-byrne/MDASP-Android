@@ -101,13 +101,14 @@ private fun calcFraction(a: Float, b: Float, pos: Float) =
 @Composable
 fun LabeledSlider(
     labels: List<String>,
-    snapToDiscrete: Boolean = true,
+    snapToLabels: Boolean = false,
+    enabled: Boolean = true,
+    invertDirection: Boolean = false,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0, value: Float,
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit
 ) {
-    //val (sliderValue, setSliderValue) = remember { mutableStateOf(value) }
     val drawPadding = with(LocalDensity.current) { 16.dp.toPx() }
     val textSize = with(LocalDensity.current) { 12.dp.toPx() }
     val lineHeightDp = 14.dp
@@ -151,8 +152,9 @@ fun LabeledSlider(
             modifier = Modifier.fillMaxWidth(),
             value = value,
             valueRange = valueRange,
-            steps = if (snapToDiscrete) labels.size.minus(2) else steps,
-            colors = customSliderColors(),
+            enabled = enabled,
+            steps = if (snapToLabels) labels.size.minus(2) else steps,
+            colors = customSliderColors(invertDirection),
             onValueChange = onValueChange,
             onValueChangeFinished = onValueChangeFinished
         )
@@ -160,7 +162,18 @@ fun LabeledSlider(
 }
 
 @Composable
-private fun customSliderColors(): SliderColors = SliderDefaults.colors(
-    activeTickColor = Color.Transparent,
-    inactiveTickColor = Color.Transparent
-)
+private fun customSliderColors(invertDirection: Boolean): SliderColors {
+    return if (invertDirection) {
+        SliderDefaults.colors(
+            activeTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+            inactiveTrackColor = MaterialTheme.colorScheme.primary,
+            disabledActiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            disabledInactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent)
+    } else {
+        SliderDefaults.colors(
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent)
+    }
+}

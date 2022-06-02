@@ -11,13 +11,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.augustbyrne.mdaspcompanion.ble.ConnectionManager
 import timber.log.Timber
@@ -38,6 +42,7 @@ private val gattCharacteristic = BluetoothGattCharacteristic(
 @Composable
 fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
     val device by viewModel.device.observeAsState()
+    var volume by viewModel.audioModel.volume
     var equalizer by viewModel.audioModel.eq
     var compressor by viewModel.audioModel.comp
     val iconTintEQ by animateColorAsState(
@@ -100,6 +105,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
             title = { Text("MDASP Controller") },
             actions = {
                 Button(
+                    modifier = Modifier.padding(end = 4.dp),
                     onClick = { liveMode = !liveMode },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = liveModeTint,
@@ -115,6 +121,43 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                 .fillMaxSize()
                 .weight(1f)
         ) {
+            /** Volume Slider UI **/
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(8.dp)
+                ) {
+                    Column(Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Input Volume",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Slider(
+                            value = volume,
+                            onValueChange = {
+                                volume = it
+                                if (liveMode) writeToGatt(
+                                    device,
+                                    "0200".hexToBytes(),
+                                    volume
+                                )
+                            },
+                            valueRange = (-90f..0f),
+                            steps = 0,
+                            colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.surface),
+                            onValueChangeFinished = {
+                                if (!liveMode) writeToGatt(
+                                    device,
+                                    "0200".hexToBytes(),
+                                    volume
+                                )
+                            }
+                        )
+                    }
+                }
+            }
             /** Parametric Equalizer UI **/
             item {
                 Card(
@@ -186,37 +229,39 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 onClick = {
                                                     equalizer = equalizer.copy(
                                                         hp = !equalizer.hp,
-                                                        hs = false
+                                                        ls = false
                                                     )
                                                     writeToGatt(
                                                         device,
-                                                        "0002".hexToBytes(),
-                                                        equalizer.hs
+                                                        "0005".hexToBytes(),
+                                                        false
                                                     )
                                                     writeToGatt(
                                                         device,
                                                         "0001".hexToBytes(),
-                                                        equalizer.hp
+                                                        equalizer.hp,
+                                                        true
                                                     )
                                                 })
                                             FilterChip(
                                                 modifier = Modifier.padding(horizontal = 4.dp),
                                                 label = { Text("shelf") },
-                                                selected = equalizer.hs,
+                                                selected = equalizer.ls,
                                                 onClick = {
                                                     equalizer = equalizer.copy(
-                                                        hs = !equalizer.hs,
+                                                        ls = !equalizer.ls,
                                                         hp = false
                                                     )
                                                     writeToGatt(
                                                         device,
                                                         "0001".hexToBytes(),
-                                                        equalizer.hp
+                                                        false
                                                     )
                                                     writeToGatt(
                                                         device,
-                                                        "0002".hexToBytes(),
-                                                        equalizer.hs
+                                                        "0005".hexToBytes(),
+                                                        equalizer.ls,
+                                                        true
                                                     )
                                                 })
                                         }
@@ -235,10 +280,15 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             "10k",
                                             "20kHz"
                                         ),
-                                        snapToDiscrete = false,
-                                        value = if (equalizer.hp) log2(equalizer.hp_freq) else log2(
-                                            equalizer.hs_freq
-                                        ),
+                                        enabled = (equalizer.hp || equalizer.ls),
+                                        invertDirection = true,
+                                        value = if (equalizer.hp) {
+                                            log2(equalizer.hp_freq)
+                                        } else if (equalizer.ls) {
+                                            log2(equalizer.ls_freq)
+                                        } else {
+                                            4.3219f
+                                               },
                                         onValueChange = { logVal ->
                                             if (equalizer.hp) {
                                                 equalizer = equalizer.copy(hp_freq = 2f.pow(logVal))
@@ -247,12 +297,12 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                     "0007".hexToBytes(),
                                                     equalizer.hp_freq / 48000f
                                                 )
-                                            } else if (equalizer.hs) {
-                                                equalizer = equalizer.copy(hs_freq = 2f.pow(logVal))
+                                            } else if (equalizer.ls) {
+                                                equalizer = equalizer.copy(ls_freq = 2f.pow(logVal))
                                                 if (liveMode) writeToGatt(
                                                     device,
-                                                    "0008".hexToBytes(),
-                                                    equalizer.hs_freq / 48000f
+                                                    "000B".hexToBytes(),
+                                                    equalizer.ls_freq / 48000f
                                                 )
                                             }
                                         },
@@ -263,11 +313,11 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                     "0007".hexToBytes(),
                                                     equalizer.hp_freq / 48000f
                                                 )
-                                            } else if (equalizer.hs) {
+                                            } else if (equalizer.ls) {
                                                 if (!liveMode) writeToGatt(
                                                     device,
-                                                    "0008".hexToBytes(),
-                                                    equalizer.hs_freq / 48000f
+                                                    "000B".hexToBytes(),
+                                                    equalizer.ls_freq / 48000f
                                                 )
                                             }
                                         },
@@ -301,37 +351,39 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 onClick = {
                                                     equalizer = equalizer.copy(
                                                         lp = !equalizer.lp,
-                                                        ls = false
+                                                        hs = false
                                                     )
                                                     writeToGatt(
                                                         device,
-                                                        "0005".hexToBytes(),
-                                                        equalizer.ls
+                                                        "0002".hexToBytes(),
+                                                        false
                                                     )
                                                     writeToGatt(
                                                         device,
                                                         "0004".hexToBytes(),
-                                                        equalizer.lp
+                                                        equalizer.lp,
+                                                        true
                                                     )
                                                 })
                                             FilterChip(
                                                 modifier = Modifier.padding(horizontal = 4.dp),
                                                 label = { Text("shelf") },
-                                                selected = equalizer.ls,
+                                                selected = equalizer.hs,
                                                 onClick = {
                                                     equalizer = equalizer.copy(
-                                                        ls = !equalizer.ls,
+                                                        hs = !equalizer.hs,
                                                         lp = false
                                                     )
                                                     writeToGatt(
                                                         device,
                                                         "0004".hexToBytes(),
-                                                        equalizer.lp
+                                                        false
                                                     )
                                                     writeToGatt(
                                                         device,
-                                                        "0005".hexToBytes(),
-                                                        equalizer.ls
+                                                        "0002".hexToBytes(),
+                                                        equalizer.hs,
+                                                        true
                                                     )
                                                 })
                                         }
@@ -350,15 +402,29 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             "10k",
                                             "20kHz"
                                         ),
-                                        snapToDiscrete = false,
-                                        value = if (equalizer.lp) log2(equalizer.lp_freq) else log2(
-                                            equalizer.ls_freq
-                                        ),
+                                        enabled = (equalizer.lp || equalizer.hs),
+                                        value = if (equalizer.lp) {
+                                            log2(equalizer.lp_freq)
+                                        } else if (equalizer.hs){
+                                            log2(equalizer.hs_freq)
+                                        } else {
+                                            14.2877f
+                                               },
                                         onValueChange = { logVal ->
-                                            equalizer = if (equalizer.lp) {
-                                                equalizer.copy(lp_freq = 2f.pow(logVal))
-                                            } else {
-                                                equalizer.copy(ls_freq = 2f.pow(logVal))
+                                            if (equalizer.lp) {
+                                                equalizer = equalizer.copy(lp_freq = 2f.pow(logVal))
+                                                if (liveMode) writeToGatt(
+                                                    device,
+                                                    "000A".hexToBytes(),
+                                                    equalizer.lp_freq / 48000f
+                                                )
+                                            } else if (equalizer.hs) {
+                                                equalizer = equalizer.copy(hs_freq = 2f.pow(logVal))
+                                                if (liveMode) writeToGatt(
+                                                    device,
+                                                    "0008".hexToBytes(),
+                                                    equalizer.hs_freq / 48000f
+                                                )
                                             }
                                         },
                                         onValueChangeFinished = {
@@ -366,12 +432,12 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 if (!liveMode) writeToGatt(
                                                     device,
                                                     "000A".hexToBytes(),
-                                                    equalizer.hp_freq / 48000f
+                                                    equalizer.lp_freq / 48000f
                                                 )
-                                            } else if (equalizer.ls) {
+                                            } else if (equalizer.hs) {
                                                 if (!liveMode) writeToGatt(
                                                     device,
-                                                    "000B".hexToBytes(),
+                                                    "0008".hexToBytes(),
                                                     equalizer.hs_freq / 48000f
                                                 )
                                             }
@@ -444,7 +510,17 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                 Column(Modifier.padding(8.dp)) {
                                     Text("Pregain")
                                     LabeledSlider(
-                                        labels = listOf("0dB", "6", "12", "18", "24", "30", "36", "42", "48dB"),
+                                        labels = listOf(
+                                            "0dB",
+                                            "6",
+                                            "12",
+                                            "18",
+                                            "24",
+                                            "30",
+                                            "36",
+                                            "42",
+                                            "48dB"
+                                        ),
                                         value = compressor.pregain,
                                         onValueChange = {
                                             compressor = compressor.copy(pregain = it)
@@ -454,7 +530,6 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 compressor.pregain
                                             )
                                         },
-                                        snapToDiscrete = false,
                                         valueRange = (0f..48f),
                                         steps = 49,
                                         onValueChangeFinished = {
@@ -478,8 +553,37 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                 )
                             ) {
                                 Column(Modifier.padding(8.dp)) {
-                                    Text("Threshold")
-                                    Slider(
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text("Threshold")
+                                        FilterChip(
+                                            modifier = Modifier.padding(horizontal = 4.dp),
+                                            label = { Text("makeup gain") },
+                                            selected = compressor.makeupgain,
+                                            onClick = {
+                                                compressor = compressor.copy(makeupgain = !compressor.makeupgain)
+                                                writeToGatt(
+                                                    device,
+                                                    "010E".hexToBytes(),
+                                                    compressor.makeupgain
+                                                )
+                                            })
+                                    }
+                                    LabeledSlider(
+                                        labels = listOf(
+                                            "-96dB",
+                                            "-84",
+                                            "-72",
+                                            "-60",
+                                            "-48",
+                                            "-36",
+                                            "-24",
+                                            "-12",
+                                            "0dB"
+                                        ),
                                         value = compressor.threshold,
                                         onValueChange = {
                                             compressor = compressor.copy(threshold = it)
@@ -489,7 +593,6 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 compressor.threshold
                                             )
                                         },
-                                        enabled = !compressor.passthrough,
                                         valueRange = -96f..0f,
                                         steps = 97,
                                         onValueChangeFinished = {
@@ -500,19 +603,6 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             )
                                         }
                                     )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "-96dB",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                        Text(
-                                            text = "0dB",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
                                 }
                             }
                             Card(
@@ -527,7 +617,14 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                             ) {
                                 Column(Modifier.padding(8.dp)) {
                                     Text("Knee")
-                                    Slider(
+                                    LabeledSlider(
+                                        labels = listOf(
+                                            "0dB",
+                                            "10",
+                                            "20",
+                                            "30",
+                                            "40dB"
+                                        ),
                                         value = compressor.knee,
                                         onValueChange = {
                                             compressor = compressor.copy(knee = it)
@@ -537,7 +634,6 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 compressor.knee
                                             )
                                         },
-                                        enabled = !compressor.passthrough,
                                         valueRange = (0f..40f),
                                         steps = 41,
                                         onValueChangeFinished = {
@@ -548,19 +644,6 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             )
                                         }
                                     )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "0dB",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                        Text(
-                                            text = "40dB",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
                                 }
                             }
                             Card(
@@ -575,63 +658,113 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                             ) {
                                 Column(Modifier.padding(8.dp)) {
                                     Text("Ratio")
-                                    Slider(
+                                    LabeledSlider(
+                                        labels = listOf(
+                                            "1:1",
+                                            "4:1",
+                                            "7:1",
+                                            "10:1",
+                                            "13:1",
+                                            "16:1",
+                                            "20:1"
+                                        ),
                                         value = compressor.ratio,
                                         onValueChange = {
                                             compressor = compressor.copy(ratio = it)
                                             if (liveMode) writeToGatt(
                                                 device,
-                                                "0103".hexToBytes(),
+                                                "0104".hexToBytes(),
                                                 compressor.ratio
                                             )
                                         },
-                                        enabled = !compressor.passthrough,
                                         valueRange = (1f..20f),
                                         steps = 20,
                                         onValueChangeFinished = {
                                             if (!liveMode) writeToGatt(
                                                 device,
-                                                "0103".hexToBytes(),
+                                                "0104".hexToBytes(),
                                                 compressor.ratio
                                             )
                                         }
                                     )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "1dB",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                        Text(
-                                            text = "20dB",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
                                 }
                             }
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp)
-                                    .clickable { showAdvanced = !showAdvanced },
+                                    .padding(8.dp),
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surface.copy(
                                         alpha = 0.9f
                                     )
                                 )
                             ) {
-                                Row(Modifier.padding(8.dp)) {
+                                Column(Modifier.padding(8.dp)) {
+                                    Text("Postgain")
+                                    LabeledSlider(
+                                        labels = listOf(
+                                            "0dB",
+                                            "6",
+                                            "12",
+                                            "18",
+                                            "24",
+                                            "30",
+                                            "36",
+                                            "42",
+                                            "48dB"
+                                        ),
+                                        value = compressor.postgain,
+                                        onValueChange = {
+                                            compressor = compressor.copy(postgain = it)
+                                            if (liveMode) writeToGatt(
+                                                device,
+                                                "010C".hexToBytes(),
+                                                compressor.postgain
+                                            )
+                                        },
+                                        valueRange = (0f..48f),
+                                        steps = 49,
+                                        onValueChangeFinished = {
+                                            if (!liveMode) writeToGatt(
+                                                device,
+                                                "010C".hexToBytes(),
+                                                compressor.postgain
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(
+                                        alpha = 0.9f
+                                    )
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showAdvanced = !showAdvanced }
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.Start
+                                ) {
                                     Text("advanced compressor settings")
-                                    Icon(Icons.Default.ArrowDropDown, "")
+                                    if (!showAdvanced) {
+                                        Icon(Icons.Default.ArrowDropDown, "")
+                                    } else {
+                                        Icon(Icons.Default.ArrowDropUp, "")
+                                    }
                                 }
                                 AnimatedVisibility(visible = showAdvanced) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .wrapContentHeight()
-                                            .padding(8.dp)
+                                            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
+                                            .clip(MaterialTheme.shapes.medium)
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -639,6 +772,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             TextField(
+                                                modifier = Modifier.fillMaxWidth(),
                                                 value = compressor.attack.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
@@ -648,15 +782,19 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                         }
                                                     }
                                                 },
-                                                label = { Text("Attack (0 to 1 sec)") }
+                                                label = { Text("Attack (0 to 1 sec)") },
+                                                trailingIcon = {
+                                                    Button(
+                                                        modifier = Modifier.padding(end = 4.dp),
+                                                        onClick = {
+                                                        writeToGatt(
+                                                            device,
+                                                            "0105".hexToBytes(),
+                                                            compressor.attack
+                                                        )
+                                                    }) { Text("apply") }
+                                                }
                                             )
-                                            Button(onClick = {
-                                                writeToGatt(
-                                                    device,
-                                                    "0104".hexToBytes(),
-                                                    compressor.attack
-                                                )
-                                            }) { Text("apply") }
                                         }
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -664,6 +802,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             TextField(
+                                                modifier = Modifier.fillMaxWidth(),
                                                 value = compressor.release.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
@@ -673,15 +812,19 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                         }
                                                     }
                                                 },
-                                                label = { Text("Release (0 to 1 sec)") }
+                                                label = { Text("Release (0 to 1 sec)") },
+                                                trailingIcon = {
+                                                    Button(
+                                                        modifier = Modifier.padding(end = 4.dp),
+                                                        onClick = {
+                                                        writeToGatt(
+                                                            device,
+                                                            "0106".hexToBytes(),
+                                                            compressor.release
+                                                        )
+                                                    }) { Text("apply") }
+                                                }
                                             )
-                                            Button(onClick = {
-                                                writeToGatt(
-                                                    device,
-                                                    "0105".hexToBytes(),
-                                                    compressor.release
-                                                )
-                                            }) { Text("apply") }
                                         }
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -689,6 +832,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             TextField(
+                                                modifier = Modifier.fillMaxWidth(),
                                                 value = compressor.predelay.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
@@ -698,15 +842,19 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                         }
                                                     }
                                                 },
-                                                label = { Text("Predelay (0 to 1 sec)") }
+                                                label = { Text("Predelay (0 to 1 sec)") },
+                                                trailingIcon = {
+                                                    Button(
+                                                        modifier = Modifier.padding(end = 4.dp),
+                                                        onClick = {
+                                                        writeToGatt(
+                                                            device,
+                                                            "0107".hexToBytes(),
+                                                            compressor.predelay
+                                                        )
+                                                    }) { Text("apply") }
+                                                }
                                             )
-                                            Button(onClick = {
-                                                writeToGatt(
-                                                    device,
-                                                    "0106".hexToBytes(),
-                                                    compressor.predelay
-                                                )
-                                            }) { Text("apply") }
                                         }
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -714,7 +862,8 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             TextField(
-                                                value = compressor.attack.toString(),
+                                                modifier = Modifier.fillMaxWidth(),
+                                                value = compressor.wet.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
                                                         if (value >= 0f) {
@@ -723,15 +872,19 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                         }
                                                     }
                                                 },
-                                                label = { Text("Wet (full dry at 0 to full wet at 1)") }
+                                                label = { Text("Wet (full dry at 0 to full wet at 1)") },
+                                                trailingIcon = {
+                                                    Button(
+                                                        modifier = Modifier.padding(end = 4.dp),
+                                                        onClick = {
+                                                        writeToGatt(
+                                                            device,
+                                                            "010D".hexToBytes(),
+                                                            compressor.wet
+                                                        )
+                                                    }) { Text("apply") }
+                                                }
                                             )
-                                            Button(onClick = {
-                                                writeToGatt(
-                                                    device,
-                                                    "010C".hexToBytes(),
-                                                    compressor.wet
-                                                )
-                                            }) { Text("apply") }
                                         }
                                     }
                                 }
@@ -744,27 +897,33 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
     }
 }
 
-fun writeToGatt(device: BluetoothDevice?, writeLocation: ByteArray, payload: Any) {
-    device?.let {
-        val writeBytes: ByteArray = when (payload) {
-            is Float -> {
-                floatToByteArray(payload)
+private var prevTime: Long = 0L
+
+fun writeToGatt(device: BluetoothDevice?, writeLocation: ByteArray, payload: Any, ignoreDelay: Boolean = false) {
+    val newTime: Long = System.currentTimeMillis()
+    if (ignoreDelay || (newTime - prevTime) > 14) {
+        prevTime = newTime
+        device?.let {
+            val writeBytes: ByteArray = when (payload) {
+                is Float -> {
+                    floatToByteArray(payload)
+                }
+                is Boolean -> {
+                    byteArrayOf(payload.toByte())
+                }
+                else -> {
+                    return
+                }
             }
-            is Boolean -> {
-                payload.toByte()
-            }
-            else -> {
-                return
-            }
+            val buff = ByteBuffer.wrap(ByteArray(writeLocation.size + writeBytes.size))
+            buff.put(writeLocation)
+            buff.put(writeBytes)
+            ConnectionManager.writeCharacteristic(
+                it,
+                gattCharacteristic,
+                buff.array()
+            )
         }
-        val buff = ByteBuffer.wrap(ByteArray(writeLocation.size + writeBytes.size))
-        buff.put(writeLocation)
-        buff.put(writeBytes)
-        ConnectionManager.writeCharacteristic(
-            it,
-            gattCharacteristic,
-            buff.array()
-        )
     }
 }
 
@@ -782,20 +941,17 @@ fun String.hexToBytes() = this.chunked(2).map { it.uppercase(Locale.US).toInt(16
 
 fun Byte.toBool() = this.toInt() != 0
 
-fun Boolean.toByte() = if (this) "01".hexToBytes() else "00".hexToBytes()
+fun Boolean.toByte() = if (this) 1.toByte() else 0.toByte()
 
 data class AudioModel(
+    var volume: MutableState<Float> = mutableStateOf(0.0f),
     var eq: MutableState<ParametricEQ> = mutableStateOf(ParametricEQ()),
     var comp: MutableState<AdvancedCompressor> = mutableStateOf(AdvancedCompressor())
 ) {
 
-    private val sizeInBytes: Int = 51
-
     fun setFromByteArray(input: ByteArray) {
         val buffer = ByteBuffer.wrap(input).asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN)
-        //byte1 = (myShort shr 8) as Byte
-        //byte2 =(myShort shr 0) as Byte
-        if (input.size == sizeInBytes || input.size == 100) {
+        if (input.size == 104) {
             buffer.apply {
                 eq.value = ParametricEQ(
                     passthrough = get().toBool().let { Timber.e("eqpass $it"); it },
@@ -815,7 +971,8 @@ data class AudioModel(
                     ls_amount = float
                 )
                 comp.value = AdvancedCompressor(
-                    passthrough = get().toBool().also { get() }.also { get() }.also { get() },
+                    passthrough = get().toBool().also { get() }.also { get() },
+                    makeupgain = get().toBool(),
                     pregain = float.let { Timber.e("comp_pregain (12) $it or (int) ${it.toInt()}"); it },
                     threshold = float.let { Timber.e("comp_threshold (-64) $it or (int) ${it.toInt()}"); it },
                     knee = float,
@@ -830,14 +987,15 @@ data class AudioModel(
                     postgain = float,
                     wet = float
                 )
+                volume.value = float
             }
             Timber.e("AudioModel is all set!")
         } else {
-            Timber.e("Size of AudioModel is $sizeInBytes but input is size ${input.size}")
+            Timber.e("Size of AudioModel should be 100 bytes but input is size ${input.size}")
         }
     }
 
-    data class ParametricEQ( // 15 elements -> 24 bytes
+    data class ParametricEQ(
         val passthrough: Boolean = true,
         val hp: Boolean = false,
         val hs: Boolean = false,
@@ -846,17 +1004,18 @@ data class AudioModel(
         val ls: Boolean = false,
         val gain: Float = 0f,
         val hp_freq: Float = 0f,
-        val hs_freq: Float = 0f,
+        val hs_freq: Float = 100.0f,
         val br_freq: Float = 0f,
-        val lp_freq: Float = 0f,
+        val lp_freq: Float = 100.0f,
         val ls_freq: Float = 0f,
-        val hs_amount: Float = 0f,
-        val br_amount: Float = 0f,
-        val ls_amount: Float = 0f
+        val hs_amount: Float = -20.0f,
+        val br_amount: Float = -20.0f,
+        val ls_amount: Float = -20.0f
     )
 
-    data class AdvancedCompressor( // 14 elements -> 27 bytes
+    data class AdvancedCompressor(
         val passthrough: Boolean = true,
+        val makeupgain: Boolean = true,
         val pregain: Float = 0f,
         val threshold: Float = 0f,
         val knee: Float = 0f,

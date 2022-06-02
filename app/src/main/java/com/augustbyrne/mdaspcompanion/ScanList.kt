@@ -49,7 +49,13 @@ fun ScanListUI(viewModel: MainViewModel, onClickDevice: (ScanResult) -> Unit) {
     val btScanner = btAdapter.bluetoothLeScanner
     val requiredPermissions =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            rememberMultiplePermissionsState(permissions = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT))
+            rememberMultiplePermissionsState(
+                permissions = listOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                )
+            )
         } else {
             rememberMultiplePermissionsState(permissions = listOf(Manifest.permission.ACCESS_FINE_LOCATION))
         }
