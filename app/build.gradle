@@ -37,13 +37,13 @@ android {
 dependencies {
     def lifecycle_version = "2.4.1"
     def hilt_version = '2.42'
-    def compose_version = '1.2.0-beta02'
+    def compose_version = '1.2.0-beta03'
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     //implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     implementation "androidx.activity:activity-ktx:1.4.0"
-    implementation 'androidx.appcompat:appcompat:1.4.1'
-    implementation 'androidx.core:core-ktx:1.7.0'
+    implementation 'androidx.appcompat:appcompat:1.4.2'
+    implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.recyclerview:recyclerview:1.2.1'
 
@@ -69,10 +69,10 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1'
 
     // New Material Design
-    implementation 'com.google.android.material:material:1.6.0'
+    implementation 'com.google.android.material:material:1.6.1'
 
     // Material 3 You Design
-    implementation "androidx.compose.material3:material3:1.0.0-alpha12"
+    implementation "androidx.compose.material3:material3:1.0.0-alpha13"
 
     // Compose Compiler
     implementation "androidx.compose.compiler:compiler:$compose_version"

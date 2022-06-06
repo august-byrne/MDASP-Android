@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.augustbyrne.mdaspcompanion.ble.ConnectionManager
 import timber.log.Timber
@@ -41,10 +42,12 @@ private val gattCharacteristic = BluetoothGattCharacteristic(
 @SuppressLint("MissingPermission")
 @Composable
 fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
     val device by viewModel.device.observeAsState()
     var volume by viewModel.audioModel.volume
     var equalizer by viewModel.audioModel.eq
     var compressor by viewModel.audioModel.comp
+    var delay by viewModel.audioModel.delay
     val iconTintEQ by animateColorAsState(
         targetValue = if (equalizer.passthrough) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
         animationSpec = tween(
@@ -89,6 +92,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
         )
     )
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
+    var showCompressorAdvanced by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize()) {
         SmallTopAppBar(
             navigationIcon = {
@@ -129,7 +133,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                         .wrapContentHeight()
                         .padding(8.dp)
                 ) {
-                    Column(Modifier.padding(8.dp)) {
+                    Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp)) {
                         Text(
                             text = "Input Volume",
                             style = MaterialTheme.typography.headlineSmall
@@ -156,6 +160,74 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                             }
                         )
                     }
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+/*                            .padding(8.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(
+                                    alpha = 0.9f
+                                )
+                            )*/
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showAdvanced = !showAdvanced }
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Row(
+                                modifier = Modifier.wrapContentWidth()
+                            ) {
+                                Text("advanced settings")
+                                if (!showAdvanced) {
+                                    Icon(Icons.Default.ArrowDropDown, "")
+                                } else {
+                                    Icon(Icons.Default.ArrowDropUp, "")
+                                }
+                            }
+                        }
+                        AnimatedVisibility(visible = showAdvanced) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .wrapContentHeight()
+                                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
+                                    .clip(MaterialTheme.shapes.medium)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextField(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        value = delay.toString(),
+                                        onValueChange = {
+                                            it.toIntOrNull()?.let { value ->
+                                                if (value in 0..400) {
+                                                    delay = value
+                                                }
+                                            }
+                                        },
+                                        label = { Text("Delay (0 to 400 millisec)") },
+                                        trailingIcon = {
+                                            Button(
+                                                modifier = Modifier.padding(end = 4.dp),
+                                                onClick = {
+                                                    writeToGatt(
+                                                        device,
+                                                        "0300".hexToBytes(),
+                                                        delay
+                                                    )
+                                                }) { Text("apply") }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             /** Parametric Equalizer UI **/
@@ -180,8 +252,10 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                 text = "Parametric EQ",
                                 style = MaterialTheme.typography.headlineSmall
                             )
-                            IconButton(onClick = { /*TODO*/ }) {
-                                Icon(Icons.Default.Info, "")
+                            IconButton(onClick = {
+                                uriHandler.openUri("https://en.wikipedia.org/wiki/Equalization_(audio)")
+                            }) {
+                                Icon(Icons.Default.Info, "EQ Info")
                             }
                         }
                         Button(
@@ -473,8 +547,10 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                 text = "Compressor",
                                 style = MaterialTheme.typography.headlineSmall
                             )
-                            IconButton(onClick = { /*TODO*/ }) {
-                                Icon(Icons.Default.Info, "")
+                            IconButton(onClick = {
+                                uriHandler.openUri("https://en.wikipedia.org/wiki/Dynamic_range_compression")
+                            }) {
+                                Icon(Icons.Default.Info, "DRC Info")
                             }
                         }
                         Button(
@@ -531,7 +607,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             )
                                         },
                                         valueRange = (0f..48f),
-                                        steps = 49,
+                                        steps = 47,
                                         onValueChangeFinished = {
                                             if (!liveMode) writeToGatt(
                                                 device,
@@ -594,7 +670,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             )
                                         },
                                         valueRange = -96f..0f,
-                                        steps = 97,
+                                        steps = 95,
                                         onValueChangeFinished = {
                                             if (!liveMode) writeToGatt(
                                                 device,
@@ -635,7 +711,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             )
                                         },
                                         valueRange = (0f..40f),
-                                        steps = 41,
+                                        steps = 39,
                                         onValueChangeFinished = {
                                             if (!liveMode) writeToGatt(
                                                 device,
@@ -678,7 +754,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             )
                                         },
                                         valueRange = (1f..20f),
-                                        steps = 20,
+                                        steps = 18,
                                         onValueChangeFinished = {
                                             if (!liveMode) writeToGatt(
                                                 device,
@@ -723,7 +799,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                             )
                                         },
                                         valueRange = (0f..48f),
-                                        steps = 49,
+                                        steps = 47,
                                         onValueChangeFinished = {
                                             if (!liveMode) writeToGatt(
                                                 device,
@@ -747,18 +823,18 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { showAdvanced = !showAdvanced }
+                                        .clickable { showCompressorAdvanced = !showCompressorAdvanced }
                                         .padding(8.dp),
                                     horizontalArrangement = Arrangement.Start
                                 ) {
                                     Text("advanced compressor settings")
-                                    if (!showAdvanced) {
+                                    if (!showCompressorAdvanced) {
                                         Icon(Icons.Default.ArrowDropDown, "")
                                     } else {
                                         Icon(Icons.Default.ArrowDropUp, "")
                                     }
                                 }
-                                AnimatedVisibility(visible = showAdvanced) {
+                                AnimatedVisibility(visible = showCompressorAdvanced) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -776,7 +852,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 value = compressor.attack.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
-                                                        if (value >= 0f) {
+                                                        if (value in 0f..1f) {
                                                             compressor =
                                                                 compressor.copy(attack = value)
                                                         }
@@ -806,7 +882,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 value = compressor.release.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
-                                                        if (value >= 0f) {
+                                                        if (value in 0f..1f) {
                                                             compressor =
                                                                 compressor.copy(release = value)
                                                         }
@@ -836,7 +912,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 value = compressor.predelay.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
-                                                        if (value >= 0f) {
+                                                        if (value in 0f..1f) {
                                                             compressor =
                                                                 compressor.copy(predelay = value)
                                                         }
@@ -866,7 +942,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 value = compressor.wet.toString(),
                                                 onValueChange = {
                                                     it.toFloatOrNull()?.let { value ->
-                                                        if (value >= 0f) {
+                                                        if (value in 0f..1f) {
                                                             compressor =
                                                                 compressor.copy(wet = value)
                                                         }
@@ -911,6 +987,9 @@ fun writeToGatt(device: BluetoothDevice?, writeLocation: ByteArray, payload: Any
                 is Boolean -> {
                     byteArrayOf(payload.toByte())
                 }
+                is Int -> {
+                    intToByteArray(payload)
+                }
                 else -> {
                     return
                 }
@@ -937,6 +1016,15 @@ fun floatToByteArray(value: Float): ByteArray {
     )
 }
 
+fun intToByteArray(value: Int): ByteArray {
+    return byteArrayOf(
+        value.toByte(),
+        (value shr 8).toByte(),
+        (value shr 16).toByte(),
+        (value shr 24).toByte()
+    )
+}
+
 fun String.hexToBytes() = this.chunked(2).map { it.uppercase(Locale.US).toInt(16).toByte() }.toByteArray()
 
 fun Byte.toBool() = this.toInt() != 0
@@ -945,24 +1033,25 @@ fun Boolean.toByte() = if (this) 1.toByte() else 0.toByte()
 
 data class AudioModel(
     var volume: MutableState<Float> = mutableStateOf(0.0f),
+    var delay: MutableState<Int> = mutableStateOf(0),
     var eq: MutableState<ParametricEQ> = mutableStateOf(ParametricEQ()),
     var comp: MutableState<AdvancedCompressor> = mutableStateOf(AdvancedCompressor())
 ) {
 
     fun setFromByteArray(input: ByteArray) {
         val buffer = ByteBuffer.wrap(input).asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN)
-        if (input.size == 104) {
+        if (input.size == 108) {
             buffer.apply {
                 eq.value = ParametricEQ(
-                    passthrough = get().toBool().let { Timber.e("eqpass $it"); it },
-                    hp = get().toBool().let { Timber.e("hp (1) $it"); it },
-                    hs = get().toBool().let { Timber.e("hs (0) $it"); it },
-                    br = get().toBool().let { Timber.e("br (0) $it"); it },
-                    lp = get().toBool().let { Timber.e("lp (1) $it"); it },
-                    ls = get().toBool().also { position(8) },//.apply { get() }.apply { get() },
-                    gain = float.let { Timber.e("eqgain $it or (int) ${it.toInt()}"); it },
-                    hp_freq = float.let { Timber.e("hp_freq $it or (int) ${it.toInt()}"); it },
-                    hs_freq = float.let { Timber.e("hs_freq $it or (int) ${it.toInt()}"); it },
+                    passthrough = get().toBool().let { Timber.e("eq_passthrough $it"); it },
+                    hp = get().toBool().let { Timber.e("hp: $it"); it },
+                    hs = get().toBool().let { Timber.e("hs: $it"); it },
+                    br = get().toBool().let { Timber.e("br: $it"); it },
+                    lp = get().toBool().let { Timber.e("lp: $it"); it },
+                    ls = get().toBool().also { position(8) },
+                    gain = float.let { Timber.e("eqgain $it"); it },
+                    hp_freq = float.let { Timber.e("hp_freq $it"); it },
+                    hs_freq = float.let { Timber.e("hs_freq $it"); it },
                     br_freq = float,
                     lp_freq = float,
                     ls_freq = float,
@@ -971,10 +1060,10 @@ data class AudioModel(
                     ls_amount = float
                 )
                 comp.value = AdvancedCompressor(
-                    passthrough = get().toBool().also { get() }.also { get() },
-                    makeupgain = get().toBool(),
-                    pregain = float.let { Timber.e("comp_pregain (12) $it or (int) ${it.toInt()}"); it },
-                    threshold = float.let { Timber.e("comp_threshold (-64) $it or (int) ${it.toInt()}"); it },
+                    passthrough = get().toBool(),
+                    makeupgain = get().toBool().also { get() }.also { get() },
+                    pregain = float.let { Timber.e("comp_pregain (12) $it"); it },
+                    threshold = float.let { Timber.e("comp_threshold (-64) $it"); it },
                     knee = float,
                     ratio = float,
                     attack = float,
@@ -988,10 +1077,11 @@ data class AudioModel(
                     wet = float
                 )
                 volume.value = float
+                delay.value = int
             }
             Timber.e("AudioModel is all set!")
         } else {
-            Timber.e("Size of AudioModel should be 100 bytes but input is size ${input.size}")
+            Timber.e("Size of AudioModel should be 108 bytes but input is size ${input.size}")
         }
     }
 

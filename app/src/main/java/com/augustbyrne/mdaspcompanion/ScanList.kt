@@ -22,15 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,15 +80,24 @@ fun ScanListUI(viewModel: MainViewModel, onClickDevice: (ScanResult) -> Unit) {
                             .fillMaxWidth()
                             .wrapContentHeight()
                             .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
                     ) {
                         Column {
-                            //Text("MDASP Audio Processor")
-                            Text(scannedItem.device.name ?: "Unknown Name")
+                            Text(
+                                style = MaterialTheme.typography.titleLarge,
+                                text = scannedItem.device.name ?: "Unknown Name"
+                            )
                             Spacer(Modifier.height(4.dp))
-                            Text("MAC Address: ${scannedItem.device.address}")
+                            Text(
+                                style = MaterialTheme.typography.bodyLarge,
+                                text = "MAC Address: ${scannedItem.device.address}"
+                            )
                         }
-                        Text("${scannedItem.rssi} dBm")
+                        Text(
+                            style = MaterialTheme.typography.bodyLarge,
+                            text = "${scannedItem.rssi} dBm"
+                        )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
