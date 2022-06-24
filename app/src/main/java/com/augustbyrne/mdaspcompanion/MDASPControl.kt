@@ -11,10 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -44,6 +41,7 @@ private val gattCharacteristic = BluetoothGattCharacteristic(
 fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     val device by viewModel.device.observeAsState()
+    //val presetsList by viewModel.presetsList.observeAsState()
     var volume by viewModel.audioModel.volume
     var equalizer by viewModel.audioModel.eq
     var compressor by viewModel.audioModel.comp
@@ -93,6 +91,8 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
     )
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
     var showCompressorAdvanced by rememberSaveable { mutableStateOf(false) }
+    var presetMenuToggle by rememberSaveable { mutableStateOf(false) }
+    var newPresetDialog by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize()) {
         SmallTopAppBar(
             navigationIcon = {
@@ -125,6 +125,43 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                 .fillMaxSize()
                 .weight(1f)
         ) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Presets",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        DropdownMenu(expanded = presetMenuToggle, onDismissRequest = { presetMenuToggle = false }) {
+                            // TODO: Create presets dropdown
+/*                            for (presets in presetsList) {
+                                DropdownMenuItem(text = { *//*TODO*//* }, onClick = {
+
+                                })
+                            }*/
+                            DropdownMenuItem(
+                                leadingIcon = { Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add a new preset"
+                                ) },
+                                text = { Text("New Preset") },
+                                onClick = {
+                                    presetMenuToggle = false
+                                    newPresetDialog = true
+                            })
+                        }
+                    }
+                }
+            }
             /** Volume Slider UI **/
             item {
                 Card(
@@ -135,7 +172,7 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                 ) {
                     Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp)) {
                         Text(
-                            text = "Input Volume",
+                            text = "Master Volume",
                             style = MaterialTheme.typography.headlineSmall
                         )
                         Slider(
@@ -224,6 +261,17 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                                 }) { Text("apply") }
                                         }
                                     )
+                                }
+                                // TODO: Untested
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Set current audio parameters as device default")
+                                    Button(onClick = { writeToGatt(device, "CAFE".hexToBytes()) }) {
+                                        Text("apply")
+                                    }
                                 }
                             }
                         }
@@ -823,7 +871,9 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { showCompressorAdvanced = !showCompressorAdvanced }
+                                        .clickable {
+                                            showCompressorAdvanced = !showCompressorAdvanced
+                                        }
                                         .padding(8.dp),
                                     horizontalArrangement = Arrangement.Start
                                 ) {
@@ -975,12 +1025,12 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
 
 private var prevTime: Long = 0L
 
-fun writeToGatt(device: BluetoothDevice?, writeLocation: ByteArray, payload: Any, ignoreDelay: Boolean = false) {
+fun writeToGatt(device: BluetoothDevice?, writeLocation: ByteArray, payload: Any? = null, ignoreDelay: Boolean = false) {
     val newTime: Long = System.currentTimeMillis()
     if (ignoreDelay || (newTime - prevTime) > 14) {
         prevTime = newTime
         device?.let {
-            val writeBytes: ByteArray = when (payload) {
+            val writeBytes: ByteArray? = when (payload) {
                 is Float -> {
                     floatToByteArray(payload)
                 }
@@ -991,12 +1041,12 @@ fun writeToGatt(device: BluetoothDevice?, writeLocation: ByteArray, payload: Any
                     intToByteArray(payload)
                 }
                 else -> {
-                    return
+                    null
                 }
             }
-            val buff = ByteBuffer.wrap(ByteArray(writeLocation.size + writeBytes.size))
+            val buff = ByteBuffer.wrap(ByteArray(writeLocation.size + (writeBytes?.size ?: 0)))
             buff.put(writeLocation)
-            buff.put(writeBytes)
+            writeBytes?.let { it1 -> buff.put(it1) }
             ConnectionManager.writeCharacteristic(
                 it,
                 gattCharacteristic,
@@ -1094,9 +1144,9 @@ data class AudioModel(
         val ls: Boolean = false,
         val gain: Float = 0f,
         val hp_freq: Float = 0f,
-        val hs_freq: Float = 100.0f,
+        val hs_freq: Float = 24000.0f,
         val br_freq: Float = 0f,
-        val lp_freq: Float = 100.0f,
+        val lp_freq: Float = 24000.0f,
         val ls_freq: Float = 0f,
         val hs_amount: Float = -20.0f,
         val br_amount: Float = -20.0f,
