@@ -23,17 +23,16 @@ fun ParametricEqUI(eq: AudioModel.ParametricEQ) {
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(),
-        xRange = 1f..4f,//-4f..4f,
-        yRange = 0f..1f,//-2f..4f,//10f.pow(-24/40)..1f,
-        //xLogBase = 10f,
-        //yLogBase = 10f,
-        xLogMode = LogMode.Octave,
+        xRange = 20f..20000f,//-4f..4f,
+        yRange = -(10f.pow(-24/40))..0f,
+        xLogBase = 2f,
+        yLogBase = 10f,
         yLogMode = LogMode.Voltage,
         colorIntersect = true,
         equations = arrayOf(
             { x: Float ->
-                //1/sqrt(1+(x-10f.pow(eq.lp_freq/20)).pow(2*n))
-                log10(x)
+                1/sqrt(1+(x/eq.lp_freq).pow(2*n))
+                //log10(x)
 
                 //1/sqrt(1+(x-20*log10(eq.lp_freq)).pow(2*n))
 
@@ -42,7 +41,7 @@ fun ParametricEqUI(eq: AudioModel.ParametricEQ) {
                 //20*log10(1/ sqrt(1+10f.pow((x-eq.lp_freq)/40).pow(2*n)))
             },
             { x: Float ->
-                -(x/6)+1
+                1/sqrt(1+(eq.hp_freq/x).pow(2*n))
             }
         )
     )
@@ -58,7 +57,6 @@ fun MathGraph(
     showAxis: Boolean = true,
     xLogBase: Float? = null,
     yLogBase: Float? = null,
-    xLogMode: LogMode? = null,
     yLogMode: LogMode? = null,
     colorIntersect: Boolean = false,
     vararg equations: (x: Float) -> Float
@@ -108,28 +106,13 @@ fun MathGraph(
             val eqnPath = Path()
             var firstVal = true
             Timber.d("here: 1")
-            var x = if (xLogBase != null) {
-                if (xLogMode == LogMode.Octave) {
-                    //log(xRange.start, xLogBase)
-                    //xLogBase.pow(xRange.start)
-                    log(xRange.start, xLogBase)
-                } else {
-                    log(xRange.start, xLogBase)
-                }
-            } else {
-                xRange.start
-            }
+            var x = xRange.start
             // screen increments dx and dy
             val dx: Float = (xRange.endInclusive - xRange.start) / size.width
             val dy: Float = 2f * (yRange.endInclusive - yRange.start) / size.width
             Timber.d("here: 2")
             // this might have something to do with loc scale graphing issues
-            val endX = if (xLogBase != null) {
-                log(xRange.endInclusive, xLogBase)
-            } else {
-                xRange.endInclusive
-            }
-            while (x <= endX) {
+            while (x <= xRange.endInclusive) {
 
                 val y: Float = if (yLogBase != null) {
                     when (yLogMode) {
@@ -149,17 +132,15 @@ fun MathGraph(
                 Timber.d("here: 3")
                 // remove x starting offset, normalize, and then multiply by screen width
                 val xLoc: Float = if (xLogBase != null) {
-                    xLogBase.pow(x - xRange.start) / dx
+                    (log(x,xLogBase) - log(xRange.start,xLogBase)).div(
+                        (log(xRange.endInclusive,xLogBase) - log(xRange.start,xLogBase)) / size.width
+                    )
                 } else {
                     (x - xRange.start) / dx
                 }
 
                 // y location, normalize, then multiply by screen height, add starting y
-                val yLoc: Float = if (yLogBase != null) {
-                    (-y / dy) + origin.y
-                } else {
-                    (-y / dy) + origin.y
-                }
+                val yLoc: Float = (-y / dy) + origin.y
 
                 if (yLoc in 0f..0.5f * size.width) {
                     if (firstVal) {
@@ -178,16 +159,7 @@ fun MathGraph(
                 }
                 Timber.d("xValue:", x)
                 Timber.d("yValue:", y)
-                x += if (xLogBase != null) {
-                    if (xLogMode == LogMode.Octave) {
-                        log(dx, xLogBase)
-                        //xLogBase.pow(dx)
-                    } else {
-                        log(dx, xLogBase)
-                    }
-                } else {
-                    dx
-                }
+                x += dx
             }
             drawPath(path = eqnPath, color = Color.Black, style = Stroke(6f))
             paths.add(eqnPath)
@@ -213,12 +185,12 @@ fun MathGraph(
 data class GraphOrigin(val x: Float, val y: Float)
 
 enum class LogMode {
-    Power, Voltage, Octave
+    Power, Voltage
 }
 
 
 @Composable
 @Preview
 fun EqUITest() {
-    ParametricEqUI(AudioModel.ParametricEQ(lp_freq = 10000f))
+    ParametricEqUI(AudioModel.ParametricEQ(lp_freq = 10000f, hp_freq = 1000f))
 }
