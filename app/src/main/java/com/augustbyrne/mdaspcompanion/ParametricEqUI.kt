@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.tooling.preview.Preview
 import com.augustbyrne.mdaspcompanion.values.blue200
+import timber.log.Timber
 import kotlin.math.*
 
 @Composable
@@ -23,12 +24,12 @@ fun ParametricEqUI(eq: AudioModel.ParametricEQ) {
             .fillMaxWidth()
             .fillMaxHeight(),
         xRange = 1f..4f,//-4f..4f,
-        yRange = 0f..4f,//-2f..4f,//10f.pow(-24/40)..1f,
-        xLogBase = 10f,
+        yRange = 0f..1f,//-2f..4f,//10f.pow(-24/40)..1f,
+        //xLogBase = 10f,
         //yLogBase = 10f,
         xLogMode = LogMode.Octave,
         yLogMode = LogMode.Voltage,
-        //colorDiff = true,
+        colorIntersect = true,
         equations = arrayOf(
             { x: Float ->
                 //1/sqrt(1+(x-10f.pow(eq.lp_freq/20)).pow(2*n))
@@ -41,7 +42,7 @@ fun ParametricEqUI(eq: AudioModel.ParametricEQ) {
                 //20*log10(1/ sqrt(1+10f.pow((x-eq.lp_freq)/40).pow(2*n)))
             },
             { x: Float ->
-                x/6
+                -(x/6)+1
             }
         )
     )
@@ -59,12 +60,12 @@ fun MathGraph(
     yLogBase: Float? = null,
     xLogMode: LogMode? = null,
     yLogMode: LogMode? = null,
-    colorDiff: Boolean = false,
+    colorIntersect: Boolean = false,
     vararg equations: (x: Float) -> Float
 ) {
     //TODO: Finish creating xLog Scale Graphing: Making dx exponentially increase
     Canvas(modifier = modifier) {
-
+        val y1: MutableList<Float> = mutableListOf()
         //graph paper
         drawRect(
             color = blue200,
@@ -106,12 +107,12 @@ fun MathGraph(
 
             val eqnPath = Path()
             var firstVal = true
-
+            Timber.d("here: 1")
             var x = if (xLogBase != null) {
                 if (xLogMode == LogMode.Octave) {
                     //log(xRange.start, xLogBase)
                     //xLogBase.pow(xRange.start)
-                    xRange.start
+                    log(xRange.start, xLogBase)
                 } else {
                     log(xRange.start, xLogBase)
                 }
@@ -121,9 +122,14 @@ fun MathGraph(
             // screen increments dx and dy
             val dx: Float = (xRange.endInclusive - xRange.start) / size.width
             val dy: Float = 2f * (yRange.endInclusive - yRange.start) / size.width
-
+            Timber.d("here: 2")
             // this might have something to do with loc scale graphing issues
-            while (x <= xRange.endInclusive) {
+            val endX = if (xLogBase != null) {
+                log(xRange.endInclusive, xLogBase)
+            } else {
+                xRange.endInclusive
+            }
+            while (x <= endX) {
 
                 val y: Float = if (yLogBase != null) {
                     when (yLogMode) {
@@ -140,9 +146,13 @@ fun MathGraph(
                 } else {
                     eqn(x)
                 }
-
+                Timber.d("here: 3")
                 // remove x starting offset, normalize, and then multiply by screen width
-                val xLoc: Float = (x - xRange.start) / dx
+                val xLoc: Float = if (xLogBase != null) {
+                    xLogBase.pow(x - xRange.start) / dx
+                } else {
+                    (x - xRange.start) / dx
+                }
 
                 // y location, normalize, then multiply by screen height, add starting y
                 val yLoc: Float = if (yLogBase != null) {
@@ -153,6 +163,7 @@ fun MathGraph(
 
                 if (yLoc in 0f..0.5f * size.width) {
                     if (firstVal) {
+                        y1.add(yLoc)
                         eqnPath.moveTo(
                             x = xLoc,
                             y = yLoc
@@ -165,6 +176,8 @@ fun MathGraph(
                         )
                     }
                 }
+                Timber.d("xValue:", x)
+                Timber.d("yValue:", y)
                 x += if (xLogBase != null) {
                     if (xLogMode == LogMode.Octave) {
                         log(dx, xLogBase)
@@ -179,13 +192,19 @@ fun MathGraph(
             drawPath(path = eqnPath, color = Color.Black, style = Stroke(6f))
             paths.add(eqnPath)
         }
-        // TODO: Diff paths plotting is untested
-        val pathDiff = paths[0]
-        for (index in 1..paths.lastIndex) {
-            pathDiff.op(pathDiff, paths[index], PathOperation.Difference)
-        }
-        //pathDiff.lineTo(0f,size.width/2)
-        if (colorDiff) {
+
+        if (colorIntersect) {
+            // Complete bounded shapes from paths
+            for (index in 0..paths.lastIndex) {
+                paths[index].lineTo(size.width, size.width / 2)
+                paths[index].lineTo(0f, size.width / 2)
+                paths[index].lineTo(0f, y1[index])
+            }
+            val pathDiff = paths[0]
+            for (index in 1..paths.lastIndex) {
+                pathDiff.op(pathDiff, paths[index], PathOperation.Intersect)
+            }
+
             drawPath(path = pathDiff, color = Color.Green, style = Fill)
         }
     }
