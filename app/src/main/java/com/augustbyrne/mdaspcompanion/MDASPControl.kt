@@ -337,6 +337,23 @@ fun MDASPControlUI(viewModel: MainViewModel, onNavBack: () -> Unit) {
                                 )
                             ) {
                                 Column(Modifier.padding(8.dp)) {
+                                    Text("Frequency Response Graph")
+                                    Spacer(Modifier.height(8.dp))
+                                    ParametricEqUI(equalizer)
+                                }
+                            }
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .wrapContentHeight()
+                                    .padding(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(
+                                        alpha = 0.9f
+                                    )
+                                )
+                            ) {
+                                Column(Modifier.padding(8.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
